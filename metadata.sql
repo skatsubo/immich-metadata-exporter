@@ -6,12 +6,16 @@ WITH assets AS (
   FROM asset
   WHERE
     (
-      "sidecarPath" IS NOT NULL 
+      (:'target' = 'known' AND "sidecarPath" IS NOT NULL)
+      OR
+      (:'target' = 'unknown' AND "sidecarPath" IS NULL)
       OR 
       :'target' = 'all'
     )
     AND "deletedAt" IS NULL
+    AND "originalPath" NOT IN ('', '*')
     AND :asset_filter
+  ORDER BY "originalPath"
 ),
 asset_tags AS (
   SELECT 
