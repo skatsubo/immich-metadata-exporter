@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
-set -u
-set -o pipefail
+set -e -u -o pipefail
 
 #
 # args
@@ -62,11 +60,6 @@ export_metadata_to_json() {
   psql_cmd -Aq -v target="$target" -v asset_filter="$asset_filter" <"$query_metadata_file" > "$metadata_file"
 }
 
-print_sidecars() {
-  log "Print existing sidecars"
-  immich_cmd sh -c 'jq -r ".[].SourceFile" | exiftool -json -@ -' <"$metadata_file"
-}
-
 handle_sidecars() {
   log "Write (create/update) sidecars"
 
@@ -79,10 +72,11 @@ handle_sidecars() {
 
   if [[ -n $preview ]]; then
     rm -rf "$sidecars_preview_dir"
-    if docker cp "$immich_container:$ime_dir/files" "$sidecars_preview_dir" >/dev/null ; then
+    if docker cp "$immich_container:$ime_dir/preview" "$sidecars_preview_dir" >/dev/null ; then
       log "Dry run done. Generated sidecars are written to: $sidecars_preview_dir.
-First 3 files: 
-$(find $sidecars_preview_dir -type f | head -3)"
+Generated files:
+$(find $sidecars_preview_dir -type f | head -3)
+..."
     fi
   fi
 }

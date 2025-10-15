@@ -97,19 +97,17 @@ The script does not modify Immich database in any way. E.g. upon creating a side
 > This is a quick PoC and work-in-progress. It is not secure against SQL injections, shell injections and other irregularities in data or file names. Try it on a throwaway Immich instance first.  
 > For a supported implementation consider using Immich API.
 
-- The `preview` mode currently works only for existing sidecars (present on disk). When processing missing sidecars it does nothing. (TODO: revisit)
-- When writing sidecars, all supported (TODO: non-empty?) metadata fields will be written, regardless of whether a field was modified or not. (Compare this to Immich behavior: it writes only modified fields).
+- When writing sidecars, all supported non-empty metadata fields will be written, regardless of whether they were modified or not. (Compare this to Immich: it writes only modified fields).
+- When the generated sidecar and the original sidecar are almost identical (have the same metadata fields and values) and only differ by exiftool version in the XMP meta `x:xmptk='Image::ExifTool <version>'`, the original sidecar will be overwritten and its file timestamp will change.
+- Timestamps (DateTimeOriginal, DateCreated) are currently written as UTC +00:00 without TZ offset. (Immich includes TZ offset when writing sidecars because TZ is provided by a user while editing timestamps. In the database, dateTimeOriginal is simply UTC).
 - File names containing line breaks are not supported.
-- Handling of empty metadata tag values is based on the exiftool implementation:
-> Empty values are not ignored, and will cause an empty value to be written if supported by the specific metadata type. Tags are deleted by using the -f option and setting the tag value to "-" (or to the MissingTagValue setting if this API option was used). Importing with -j+=JSONFILE causes new values to be added to existing lists.
 
 ## Todo
 
 Todo / maybe:
-- [ ] Write DateTimeOriginal with timezone instead of UTC (so TZ will be visible in XMP)
-- [ ] Diff/plan of changes (before applying or when dry run)
+- [ ] Write `DateTimeOriginal` with timezone instead of UTC +00:00 to have explicit TZ value in XMP timestamps (same as Immich works currently). Perhaps leverage `timeZone` value in `asset_exif`.
 - [ ] Face/people export
-- [ ] Handle/revisit empty tags
+- [ ] Execution stats (number of files created and modified)
 
 ## Sidecar example
 
