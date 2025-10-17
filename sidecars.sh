@@ -74,7 +74,6 @@ copy_existing_sidecars() {
 }
 
 write_sidecars() {
-  log
   if [[ -z $preview_dir ]]; then
     metadata="$metadata_file"
     files="$sidecars"
