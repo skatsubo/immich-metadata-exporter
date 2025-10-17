@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
-set -u
-set -o pipefail
+set -e -u -o pipefail
 
 ime_dir=/tmp/immich-metadata-exporter
 metadata_file=metadata.json
@@ -20,7 +18,7 @@ log() {
 install_tools() {
   packages="libimage-exiftool-perl jq colordiff rsync"
   if ! dpkg -s $packages &>/dev/null; then
-    log "Install tools: $packages"
+    log "Install tools inside the Immich container: $packages"
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     apt-get install -yqq --no-install-recommends $packages || echo "apt install error: exit $?"
@@ -43,7 +41,6 @@ generate_preview_configs() {
   preview_metadata_file="preview_$metadata_file"
   preview_sidecars="preview_$sidecars"
   preview_sidecars_absent="preview_$sidecars_absent"
-
   # prepend preview_dir if defined
   if [[ -n $preview_dir ]]; then
     jq --arg preview_dir "$preview_dir" 'map(.SourceFile = $preview_dir + .SourceFile)' "$metadata_file" > "$preview_metadata_file"
@@ -67,7 +64,7 @@ touch_absent_sidecars() {
   fi
   # create directories
   sed -z 's#/[^/]*$##' "$absent" | uniq | xargs -0 $xargs_debug mkdir -p
-  # touch files
+  # touch absentfiles
   xargs -0 $xargs_debug touch <"$absent"
 }
 
@@ -85,10 +82,12 @@ write_sidecars() {
     metadata="$preview_metadata_file"
     files="$preview_sidecars"
   fi
+  log "Targeting $(jq 'length' "$metadata") sidecar files"
   # use MWG module to match Immich/exiftool-vendored behavior (writing DateCreated when DateTimeOriginal is provided)
-  <"$files" tr '\0' '\n' | exiftool -json="$metadata" -overwrite_original -use MWG -@ -
+  <"$files" tr '\0' '\n' | exiftool -json="$metadata" -overwrite_original -use MWG -@ - 2>&1 | sed 's/image files updated/files updated/'
 }
 
+# diff implemented only in preview mode
 print_diff() {
   log
   echo "===================="
@@ -119,7 +118,9 @@ print_diff() {
       # plan: modify (update) if different
       echo "[*] $old"
       if [[ -n $debug ]]; then
-        colordiff -U 2 "$old" "$new" | grep -vE '(\+\+\+|---) /'
+        # diff and grep may return exit code 1 upon successful execution
+        # ignore exit status for the sake of simplicity
+        colordiff -U 2 "$old" "$new" | grep -vE '^\S*(\+\+\+|---) ' || :
         echo
       fi
     fi
@@ -130,30 +131,20 @@ print_diff() {
 # main
 #
 
-# TODO
-# trap 'rm -rf "$ime_dir"' EXIT HUP INT PIPE QUIT TERM
-
 install_tools
 scan_sidecars
 
-# actual execution or dry run (write to the original location vs write to a temp dir)
 if [[ -z $preview ]]; then
+  # actual execution (write to the original location)
   touch_absent_sidecars
   write_sidecars
 else
+  # preview / dry run (write to a temp dir)
   preview_dir="$ime_dir/preview"
-  # cleanup after previous invocation
-  rm -rf "$preview_dir"
- 
+  rm -rf "$preview_dir" 
   generate_preview_configs
   touch_absent_sidecars
   copy_existing_sidecars
   write_sidecars
   print_diff
 fi
-
-# TODO
-# cleanup by default (if $skip_cleanup is not set)
-# if [[ -z $skip_cleanup ]]; then
-#   rm -rf /tmp/ime
-# fi

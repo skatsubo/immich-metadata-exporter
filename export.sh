@@ -7,9 +7,9 @@ set -e -u -o pipefail
 #
 
 # the "where" condition (filter) to specify which assets' metadata to export
-# it will be put verbatim into the "where" clause when selecting assets for metadata export: WHERE ... AND $asset_filter
+# it will be put verbatim into the "where" clause when selecting assets for metadata export: SELECT ... FROM asset WHERE ... AND $asset_filter
 # example: selecting assets uploaded since 2025-10-10
-#   asset."createdAt" >= '2025-10-10'
+#   "createdAt" >= '2025-10-10'
 # you should edit the line between EOFs
 asset_filter=$(cat <<'EOF'
 1=1
@@ -19,7 +19,7 @@ EOF
 # target sidecars for the export
 target="${TARGET:-known}"
 
-# preview / dry run
+# preview (dry run)
 preview="${PREVIEW:-}"
 
 # debug
@@ -33,9 +33,9 @@ postgres_container=immich_postgres
 postgres_user=postgres
 postgres_db=immich
 
-metadata_file=metadata.json
 query_metadata_file=metadata.sql
 sidecars_script=sidecars.sh
+metadata_file=metadata.json
 sidecars_preview_dir=sidecars-preview
 # path inside the immich container
 ime_dir=/tmp/immich-metadata-exporter
@@ -58,22 +58,26 @@ immich_cmd() {
 export_metadata_to_json() {
   log "Export metadata to json in exiftool format: $metadata_file"
   psql_cmd -Aq -v target="$target" -v asset_filter="$asset_filter" <"$query_metadata_file" > "$metadata_file"
+
+  if ! grep -q '[^[:space:]]' "$metadata_file" ; then
+    log "WARN Empty result set in metadata.json: no asset metadata returned from the database. Check your filter. Exiting."
+    exit 0
+  fi
 }
 
 handle_sidecars() {
   log "Write (create/update) sidecars"
 
   immich_cmd mkdir -p "$ime_dir"
-
   docker cp "$metadata_file" "$immich_container:$ime_dir/$metadata_file" >/dev/null
-
   docker cp "$sidecars_script" "$immich_container:$ime_dir/$sidecars_script" >/dev/null
+
   immich_cmd sh -c "cd $ime_dir && preview=$preview debug=$debug bash $sidecars_script"
 
   if [[ -n $preview ]]; then
     rm -rf "$sidecars_preview_dir"
     if docker cp "$immich_container:$ime_dir/preview" "$sidecars_preview_dir" >/dev/null ; then
-      log "Dry run done. Generated sidecars are written to: $sidecars_preview_dir.
+      log "Preview run done. Generated sidecars are written to: $sidecars_preview_dir.
 Generated files:
 $(find $sidecars_preview_dir -type f | head -3)
 ..."
@@ -89,11 +93,10 @@ cli_print_help() {
     echo "Immich metadata to sidecar exporter"
     echo
     echo "Writes asset metadata to companion XMP sidecars."
-    echo "For more info see https://github.com/skatsubo/immich-metadata-exporter"
     echo
     echo "Usage:"
-    echo "  $0                # By default, export metadata for known assets: those that have sidecar path defined in the database"
-    echo "  $0 [--args...]    # Export with extra args: asset filter, target (see optinal arguments below)"
+    echo "  $0                # Write metadata to known sidecars (those having sidecarPath defined in the database)"
+    echo "  $0 [--args...]    # Export with extra args: asset filter, target (see optinal arguments below), preview mode, debug"
     echo "  $0 --help         # Show this help"
     echo
     echo "Optional arguments:"
@@ -106,11 +109,12 @@ cli_print_help() {
     echo "                                     It is passed verbatim to the where clause when selecting assets for export: WHERE ... AND <condition>"
     echo "                                     Default: 1=1 (no filtering)"
     echo "  --preview                          Preview (dry run). Generate metadata.json and sidecars but do not write anything to the original location."
-    echo "  --debug                            Debug. Print more verbose output."
+    echo "  --debug                            Debug. Print more verbose output. In preview mode it prints diff for modified files."
     echo
     echo "Examples:"
     echo "  $0 --preview"
-    echo "  $0 --target all --filter "'"asset.\"createdAt\" >= '"'2025-10-10'"'"'
+    echo "  $0 --preview --debug"
+    echo "  $0 --target all --filter "'"\"createdAt\" >= '"'2025-10-10'"'"'
     echo
 }
 
