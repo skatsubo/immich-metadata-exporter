@@ -4,13 +4,13 @@
 
 ## Description
 
-This is a proof of concept for exporting (writing) Immich asset metadata to companion [XMP sidecars](https://docs.immich.app/features/xmp-sidecars).
+This tool exports Immich asset metadata to companion [XMP sidecars](https://docs.immich.app/features/xmp-sidecars).
 
-Why do that? 
-- To restore accidentally deleted sidecars as discussed on Discord: [Bulk (re)write of xmp sidecar files](https://discord.com/channels/979116623879368755/1425744361718677587) (also [AnswerOverflow link](https://www.answeroverflow.com/m/1425744361718677587) to the web version).
-- This is a learning opportunity to better understand Immich data structures.
+This tool exports Immich asset metadata to XMP sidecar files. It can restore accidentally deleted sidecars or create new ones based on metadata stored in the Immich database.
 
-So I wrote this bash/SQL as a response to the Discord post, out of curiosity and to illustrate Immich asset/metadata internals.
+Motivation:
+- I wrote this bash/SQL out of curiosity as a response to the Discord post: [Bulk (re)write of xmp sidecar files](https://discord.com/channels/979116623879368755/1425744361718677587) (see indexed web version at [AnswerOverflow](https://www.answeroverflow.com/m/1425744361718677587)).
+- This is a learning opportunity to better understand Immich data structures. Therefore metadata is fetched directly from the database instead of using high-level Immich API.
 
 ## How to use
 
@@ -41,9 +41,80 @@ asset_filter=$(cat <<'EOF'
 "createdAt" >= '2025-10-10' AND "originalFileName" ILIKE '%2025%'
 EOF
 )
-
 bash export.sh --target all --filter "$asset_filter" --preview
 ```
+
+Example output (trimmed):
+<details><summary>export.sh --target all --preview --debug</summary>
+
+```
+% bash export.sh --target all --preview --debug
+
+[export_metadata_to_json] Export metadata to json in exiftool format: metadata.json
+[handle_sidecars] Write (create/update) sidecars
+[scan_sidecars] Discover existing and absent sidecars
+[generate_preview_configs]
+[touch_absent_sidecars]
+mkdir -p /tmp/immich-metadata-exporter/preview/data/library/admin/2025/2025-04 /tmp/immich-metadata-exporter/preview/data/library/admin/2025/2025-07
+touch /tmp/immich-metadata-exporter/preview/data/library/admin/2025/2025-04/photo.6.embedded.jpg.xmp /tmp/immich-metadata-exporter/preview/data/library/admin/2025/2025-07/Friends.truncated.jpg.xmp
+[copy_existing_sidecars]
+building file list ... done
+data/
+data/library/
+data/library/admin/
+data/library/admin/1905/
+data/library/admin/1905/1905-01/
+data/library/admin/1905/1905-01/portrait.jpg.xmp
+data/library/admin/2005/
+data/library/admin/2005/2005-01/
+data/library/admin/2005/2005-01/HPIM4925.jpg.xmp
+data/library/admin/2005/2005-02/
+data/library/admin/2005/2005-02/HPIM5948.jpg.xmp
+
+<... snip ...>
+
+sent 17,072 bytes  received 360 bytes  34,864.00 bytes/sec
+total size is 15,199  speedup is 0.87
+[write_sidecars] Targeting 16 sidecar files
+   16 files updated
+[print_plan]
+====================
+exiftool plan / diff
+ [+] = create
+ [*] = modify
+ [ ] = no op
+====================
+[*] /data/library/admin/2019/2019-12/IMG_3982.heic.xmp
+@@ -5,8 +5,13 @@
+  <rdf:Description rdf:about=''
+   xmlns:exif='http://ns.adobe.com/exif/1.0/'>
+-  <exif:DateTimeOriginal>2019-12-13T01:47:22.128+00:00</exif:DateTimeOriginal>
++  <exif:DateTimeOriginal>2019-12-12T20:47:22.128-05:00</exif:DateTimeOriginal>
+   <exif:GPSLatitude>40,46.174N</exif:GPSLatitude>
+   <exif:GPSLongitude>73,59.78483333W</exif:GPSLongitude>
+  </rdf:Description>
++
++ <rdf:Description rdf:about=''
++  xmlns:photoshop='http://ns.adobe.com/photoshop/1.0/'>
++  <photoshop:DateCreated>2019-12-12T20:47:22.128-05:00</photoshop:DateCreated>
++ </rdf:Description>
+ </rdf:RDF>
+ </x:xmpmeta>
+
+[+] /data/library/admin/2025/2025-04/photo.6.embedded.jpg.xmp
+[+] /data/library/admin/2025/2025-07/Friends.truncated.jpg.xmp
+[ ] /data/library/admin/2025/2025-09/10.jpg.xmp
+
+<... snip ...>
+
+[handle_sidecars] Preview done. Generated sidecars are written to: sidecars-preview.
+Generated files:
+sidecars-preview/data/library/b17b9fe7-7a0e-44cd-9745-39704c546d8d/2015/2015-06/exiftool.jpg.xmp
+sidecars-preview/data/library/admin/2025/2025-09/10.jpg.xmp
+sidecars-preview/data/library/admin/2025/2025-09/sphere.jpg.xmp
+...
+```
+</details>
 
 ### Getting help
 
@@ -57,24 +128,24 @@ Immich metadata to sidecar exporter
 Writes asset metadata to companion XMP sidecars.
 
 Usage:
-  ./export.sh                # Write metadata to known sidecars (those having sidecarPath defined in the database)
-  ./export.sh [--args...]    # Export with extra args: asset filter, target (see optinal arguments below), preview mode, debug
-  ./export.sh --help         # Show this help
+  ./export.sh                Export metadata to known sidecars (those having sidecarPath defined in the database)
+  ./export.sh --preview      Dry run: show what would be changed
+  ./export.sh [--args...]    Export with optional args: asset filter, target, preview mode, debug (see below)
+  ./export.sh --help         Show this help
 
 Optional arguments:
-  --target { known | unknown | all } Target assets/sidecars to process.
-                                       known:   process assets with existing sidecars (having non-empty 'asset.sidecarPath' in the database)
-                                       unknown: process assets without sidecars (having empty 'asset.sidecarPath' in the database)
-                                       all:     process all assets
-                                     Default: known
-  --filter <condition>               SQL "where" condition to limit which assets' metadata to export.
-                                     It is passed verbatim to the where clause when selecting assets for export: WHERE ... AND <condition>
-                                     Default: 1=1 (no filtering)
-  --preview                          Preview (dry run). Generate metadata.json and sidecars but do not write anything to the original location.
-  --debug                            Debug. Print more verbose output. In preview mode it prints diff for modified files.
+  --target { known | unknown | all }  Target assets/sidecars to process.
+                                        known:   process assets with existing sidecars (having non-empty 'asset.sidecarPath' in the database)
+                                        unknown: process assets without sidecars (having empty 'asset.sidecarPath' in the database)
+                                        all:     process all assets
+                                      Default: known
+  --filter <condition>                SQL "where" condition to limit which assets' metadata to export.
+                                      It is passed verbatim to the where clause when selecting assets for export: WHERE ... AND <condition>
+                                      Default: 1=1 (no filtering)
+  --preview                           Preview (dry run). Generate metadata.json and sidecars but do not write anything to the original location.
+  --debug                             Debug. Print more verbose output. In preview mode it prints diff for modified files.
 
 Examples:
-  ./export.sh --preview
   ./export.sh --preview --debug
   ./export.sh --target all --filter "\"createdAt\" >= '2025-10-10'"
 ```
@@ -93,8 +164,10 @@ The script does not modify Immich database in any way. E.g. upon creating a side
 ## Caveats
 
 > [!WARNING]
-> This is a quick PoC and work-in-progress. It is not resilient to weird file names or other irregularities in data. Try it in the preview mode or run against a throwaway Immich instance first.
+> This is a quick PoC and work-in-progress. It is not resilient to weird file names or other irregularities in data.  
+> It directly modifies sidecar files. Run with `--preview` first to see what will be changed.
 
+Current limitations:
 - When writing a sidecar, all supported non-empty metadata fields will be written, regardless of whether they were modified in Immich or not. (Immich writes only modified fields).
 - The tool writes timestamps (DateTimeOriginal, DateCreated) using the local+offset form (UTC offset), as per MWG guidance and as Immich does when time zone / offset is known. This works, but the offset calculation is not thoroughly tested and might produce incorrect results in edge cases.
 - Exiftool still rewrites the sidecar file even if its content is not going to be modified. Therefore its file system timestamp gets changed.
