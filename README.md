@@ -93,8 +93,7 @@ The script does not modify Immich database in any way. E.g. upon creating a side
 ## Caveats
 
 > [!WARNING]
-> This is a quick PoC and work-in-progress. It is not resilient to weird file names or other irregularities in data. Try it in the preview mode or against a throwaway Immich instance first.  
-> For a supported implementation consider using Immich API.
+> This is a quick PoC and work-in-progress. It is not resilient to weird file names or other irregularities in data. Try it in the preview mode or run against a throwaway Immich instance first.
 
 - When writing a sidecar, all supported non-empty metadata fields will be written, regardless of whether they were modified in Immich or not. (Immich writes only modified fields).
 - The tool writes timestamps (DateTimeOriginal, DateCreated) using the local+offset form (UTC offset), as per MWG guidance and as Immich does when time zone / offset is known. This works, but the offset calculation is not thoroughly tested and might produce incorrect results in edge cases.
@@ -108,7 +107,7 @@ The script does not modify Immich database in any way. E.g. upon creating a side
 - [ ] Face/people export
 - [ ] Preview stats: number of files to be created or modified
 - [ ] Cleanup on exit (remove tmp dir in the container)
-- [ ] Self contained export.sh script
+- [ ] Self contained export.sh
 
 ## Sidecar example
 
