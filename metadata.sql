@@ -14,7 +14,7 @@ WITH a AS (
     )
     AND "deletedAt" IS NULL
     AND "originalPath" NOT IN ('', '*')
-    AND :asset_filter
+    AND (:asset_filter)
   ORDER BY "originalPath"
 ),
 a_tag AS (
@@ -34,9 +34,9 @@ a_exif AS (
     --   convert Luxon fixed-offset tz `UTC+offset` to PG posix tz `-offset` with opposite sign
     --   keep named time zones as is
     --   strip seconds (last 3 chars)
-    left((
-        "dateTimeOriginal" at time zone replace(replace("timeZone", 'UTC+', '-'), 'UTC-', '+') - "dateTimeOriginal" at time zone 'UTC'
-      )::text, -3) AS utc_offset
+    TO_CHAR(
+      "dateTimeOriginal" at time zone replace(replace("timeZone", 'UTC+', '-'), 'UTC-', '+') - "dateTimeOriginal" at time zone 'UTC',
+      'HH24:MI') AS utc_offset
   FROM asset_exif
 ),
 metadata AS (
