@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e -u -o pipefail
+set -E -u -o pipefail
 
 #
 # args
@@ -28,10 +28,10 @@ debug="${DEBUG:-}"
 #
 # vars
 #
-immich_container=immich_server
-postgres_container=immich_postgres
-postgres_user=postgres
-postgres_db=immich
+immich_container=${IMMICH_CONTAINER:-immich_server}
+postgres_container=${POSTGRES_CONTAINER:-immich_postgres}
+postgres_user=${POSTGRES_USER:-postgres}
+postgres_db=${POSTGRES_DB:-immich}
 
 query_metadata_file=metadata.sql
 sidecars_script=sidecars.sh
@@ -47,12 +47,18 @@ log() {
     echo "[${FUNCNAME[1]}]" "$@"
 }
 
+handle_error() {
+  local exit_code=$?
+  log "Error in ${BASH_SOURCE[1]}:${BASH_LINENO[0]}: exit $exit_code"
+  exit $exit_code
+}
+
 psql_cmd() {
   docker exec -i "$postgres_container" psql --tuples-only -U "$postgres_user" -d "$postgres_db" "$@"
 }
 
 immich_cmd() {
-  docker exec -ti "$immich_container" "$@"
+  docker exec -i "$immich_container" "$@"
 }
 
 export_metadata_to_json() {
@@ -60,7 +66,7 @@ export_metadata_to_json() {
   psql_cmd -Aq -v target="$target" -v asset_filter="$asset_filter" <"$query_metadata_file" > "$metadata_file"
 
   if ! grep -q '[^[:space:]]' "$metadata_file" ; then
-    log "WARN Empty result set in metadata.json: no asset metadata returned from the database. Check your filter. Exiting."
+    log "WARN Empty result set in metadata.json: no asset metadata returned from the database. Check your filter."
     exit 0
   fi
 }
@@ -95,24 +101,24 @@ cli_print_help() {
     echo "Writes asset metadata to companion XMP sidecars."
     echo
     echo "Usage:"
-    echo "  $0                # Write metadata to known sidecars (those having sidecarPath defined in the database)"
-    echo "  $0 [--args...]    # Export with extra args: asset filter, target (see optinal arguments below), preview mode, debug"
-    echo "  $0 --help         # Show this help"
+    echo "  $0                Export metadata to known sidecars (those having sidecarPath defined in the database)"
+    echo "  $0 --preview      Dry run: show what would be changed"
+    echo "  $0 [--args...]    Export with optional args: asset filter, target, preview mode, debug (see below)"
+    echo "  $0 --help         Show this help"
     echo
     echo "Optional arguments:"
-    echo "  --target { known | unknown | all } Target assets/sidecars to process."
-    echo "                                       known:   process assets with existing sidecars (having non-empty 'asset.sidecarPath' in the database)"
-    echo "                                       unknown: process assets without sidecars (having empty 'asset.sidecarPath' in the database)"
-    echo "                                       all:     process all assets"
-    echo "                                     Default: known"
-    echo "  --filter <condition>               SQL \"where\" condition to limit which assets' metadata to export."
-    echo "                                     It is passed verbatim to the where clause when selecting assets for export: WHERE ... AND <condition>"
-    echo "                                     Default: 1=1 (no filtering)"
-    echo "  --preview                          Preview (dry run). Generate metadata.json and sidecars but do not write anything to the original location."
-    echo "  --debug                            Debug. Print more verbose output. In preview mode it prints diff for modified files."
+    echo "  --target { known | unknown | all }  Target assets/sidecars to process."
+    echo "                                        known:   process assets with existing sidecars (having non-empty 'asset.sidecarPath' in the database)"
+    echo "                                        unknown: process assets without sidecars (having empty 'asset.sidecarPath' in the database)"
+    echo "                                        all:     process all assets"
+    echo "                                      Default: known"
+    echo "  --filter <condition>                SQL \"where\" condition to limit which assets' metadata to export."
+    echo "                                      It is passed verbatim to the where clause when selecting assets for export: WHERE ... AND <condition>"
+    echo "                                      Default: 1=1 (no filtering)"
+    echo "  --preview                           Preview (dry run). Generate metadata.json and sidecars but do not write anything to the original location."
+    echo "  --debug                             Debug. Print more verbose output. In preview mode it prints diff for modified files."
     echo
     echo "Examples:"
-    echo "  $0 --preview"
     echo "  $0 --preview --debug"
     echo "  $0 --target all --filter "'"\"createdAt\" >= '"'2025-10-10'"'"'
     echo
@@ -133,16 +139,18 @@ cli_parse_args() {
 }
 
 validate_args() {
-  if [[ ! $target =~ ^(known|unknown|all)$ ]]; then 
-    log "ERROR Allowed target values: known, unknown, all"
+  local valid_targets=(known unknown all)
+  if [[ ! " ${valid_targets[@]} " =~ " $target " ]]; then
+    log "ERROR Allowed target values: ${valid_targets[*]}"
     cli_print_help
-    exit 1
+    exit 0
   fi 
 }
 
 #
 # main
 #
+trap handle_error ERR
 cli_parse_args "$@"
 export_metadata_to_json
 handle_sidecars

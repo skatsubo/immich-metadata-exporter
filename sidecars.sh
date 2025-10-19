@@ -15,16 +15,22 @@ else
 fi
 
 log() {
-    echo "[${FUNCNAME[1]}]" "$@"
+  echo "[${FUNCNAME[1]}]" "$@"
+}
+
+handle_error() {
+  local exit_code=$?
+  log "Error in ${BASH_SOURCE[1]}:${BASH_LINENO[0]}: exit $exit_code"
+  exit $exit_code
 }
 
 install_tools() {
   packages="libimage-exiftool-perl jq colordiff rsync"
   if ! dpkg -s $packages &>/dev/null; then
-    log "Install tools inside the Immich container: $packages"
+    log "Install tools inside the Immich container: $packages..."
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
-    apt-get install -yqq --no-install-recommends $packages || echo "apt install error: exit $?"
+    apt-get install -yqq --no-install-recommends $packages || echo "apt install error: exit $?" && exit 1
   fi
 }
 
@@ -94,12 +100,12 @@ print_plan() {
   log
   echo "===================="
   if [[ -n $debug ]]; then
-    echo "exiftool plan / diff"
+    echo "Preview: exiftool plan / diff"
     echo " [+] = create"
     echo " [*] = modify"
     echo " [ ] = no op"
   else
-    echo "exiftool plan (enable debug to view diff)"
+    echo "Preview: exiftool plan (enable debug to view diff)"
     echo " [+] = create"
     echo " [*] = modify"
   fi
@@ -126,17 +132,17 @@ print_plan() {
       if [[ -n $debug ]]; then
         # diff and grep may return exit code 1 upon successful execution
         # ignore exit status for the sake of simplicity
-        colordiff -U 2 "$old" "$new" | grep -vE '^\S*(\+\+\+|---) ' || :
+        colordiff -U 2 "$old" "$new" | grep -vE '^\S*(\+\+\+|---) ' || true
         echo
       fi
     fi
-  done < <(find "$preview_dir" -type f -print0)
+  done < <(find "$preview_dir" -type f -print0 | sort -z)
 }
 
 #
 # main
 #
-
+trap handle_error ERR
 install_tools
 scan_sidecars
 
