@@ -28,16 +28,15 @@ a_tag AS (
 ),
 a_exif AS (
   SELECT "assetId",
-    -- convert Immich / exiftool-vendored / JS timeZone to UTC offset
-    -- calculation is somewhat similar to https://www.postgresql.org/message-id/875zlhnn5d.fsf%40news-spur.riddles.org.uk
-    -- additionally
-    --   if timeZone has form `UTC+offset`, strip `UTC` and concat with timestamp to avoid interpreting it as a posix timezone (that has inverted meaning of a sign)
-    --   otherwise, if timeZone is a named time zone, keep it as is
-    --   strip seconds
-    left(
-      ("dateTimeOriginal"::timestamptz - (("dateTimeOriginal" at time zone 'UTC')||REPLACE(' '||"timeZone", ' UTC', ''))::timestamptz)::text
-      , -3
-    ) AS tz_offset -- utc_offset
+    -- convert Luxon timeZone to UTC offset
+    -- calculation is done by definition as a difference between wall clocks in two time zones, see https://www.postgresql.org/message-id/875zlhnn5d.fsf%40news-spur.riddles.org.uk
+    -- intermediate steps
+    --   convert Luxon fixed-offset tz `UTC+offset` to PG posix tz `-offset` with opposite sign
+    --   keep named time zones as is
+    --   strip seconds (last 3 chars)
+    left((
+        "dateTimeOriginal" at time zone replace(replace("timeZone", 'UTC+', '-'), 'UTC-', '+') - "dateTimeOriginal" at time zone 'UTC'
+      )::text, -3) AS utc_offset
   FROM asset_exif
 ),
 metadata AS (
@@ -45,20 +44,20 @@ metadata AS (
     COALESCE(a."sidecarPath", a."originalPath" || '.xmp') AS "SourceFile",
     NULLIF(ae.description, '') AS "Description",
     NULLIF(ae.description, '') AS "ImageDescription",
-    TO_CHAR(("dateTimeOriginal" + coalesce(tz_offset, '0')::interval) at time zone 'UTC', 'YYYY:MM:DD HH24:MI:SS.MS')
+    TO_CHAR(("dateTimeOriginal" + coalesce(utc_offset, '0')::interval) at time zone 'UTC', 'YYYY:MM:DD HH24:MI:SS.MS')
     ||
     CASE
-      WHEN tz_offset::interval > '0'::interval
-      THEN '+' || tz_offset
+      WHEN utc_offset::interval > '0'::interval
+      THEN '+' || utc_offset
       ELSE
         CASE
-          WHEN tz_offset::interval < '0'::interval
-          THEN tz_offset
+          WHEN utc_offset::interval < '0'::interval
+          THEN utc_offset
           ELSE ''
         END
     END
     AS "DateTimeOriginal",
-    a_exif.tz_offset AS "XMP:OffsetTimeOriginal", -- experimental, visible in metadata json, does not appear in a sidecar
+    a_exif.utc_offset AS "XMP:OffsetTimeOriginal", -- experimental, visible in metadata json, does not appear in a sidecar
     ae.latitude AS "GPSLatitude",
     ae.longitude AS "GPSLongitude",
     ae.rating AS "Rating",
