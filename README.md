@@ -4,7 +4,7 @@
 
 ## Description
 
-This is a proof of concept for exporting (writing) Immich asset metadata to companion XMP sidecars.
+This is a proof of concept for exporting (writing) Immich asset metadata to companion [XMP sidecars](https://docs.immich.app/features/xmp-sidecars).
 
 Why do that? 
 - To restore accidentally deleted sidecars as discussed on Discord: [Bulk (re)write of xmp sidecar files](https://discord.com/channels/979116623879368755/1425744361718677587) (also [AnswerOverflow link](https://www.answeroverflow.com/m/1425744361718677587) to the web version).
@@ -14,9 +14,9 @@ So I wrote this bash/SQL as a response to the Discord post, out of curiosity and
 
 ## How to use
 
-1. Clone the repo or download two files: [export.sh](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/export.sh), [sidecars.sh](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/sidecars.sh), [metadata.sql](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/metadata.sql).
+1. Clone the repo or download three files: [export.sh](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/export.sh), [sidecars.sh](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/sidecars.sh), [metadata.sql](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/metadata.sql).
 
-2. Run the script in `preview` mode and check the generated sidecars in `./sidecars-preview`:
+2. Run the script in `preview` mode (dry run) and check the generated sidecars in `./sidecars-preview`:
 
 ```sh
 bash export.sh --preview
@@ -30,9 +30,9 @@ bash export.sh
 
 ### Examples
 
-Run in preview mode, with debug output, targeting both known and unknown sidecars, using environment variables:
+Using environment variables. Targeting both known and unknown sidecars, run in preview mode, with debug output (prints diff for modified sidecars):
 ```sh
-TARGET=all PREVIEW=1 DEBUG=1 ./export.sh
+TARGET=all PREVIEW=1 DEBUG=1 bash export.sh
 ```
 
 Preview export with filtering: only process assets uploaded since 2025-10-10 and having "2025" in their file name. Using "heredoc" syntax for a complex SQL filter to avoid shell quoting headaches.

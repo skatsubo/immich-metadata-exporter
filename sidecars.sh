@@ -9,6 +9,9 @@ preview_dir=''
 if [[ -n $debug ]]; then
   rsync_debug="-v"
   xargs_debug="-t"
+else
+  rsync_debug=''
+  xargs_debug=''
 fi
 
 log() {
@@ -63,7 +66,7 @@ touch_absent_sidecars() {
     absent="$preview_sidecars_absent"
   fi
   # create directories
-  sed -z 's#/[^/]*$##' "$absent" | uniq | xargs -0 $xargs_debug mkdir -p
+  sed -z 's#/[^/]*$##' "$absent" | uniq -z | xargs -0 $xargs_debug mkdir -p
   # touch absentfiles
   xargs -0 $xargs_debug touch <"$absent"
 }
@@ -86,15 +89,19 @@ write_sidecars() {
   <"$files" tr '\0' '\n' | exiftool -json="$metadata" -overwrite_original -use MWG -@ - 2>&1 | sed 's/image files updated/files updated/'
 }
 
-# diff implemented only in preview mode
-print_diff() {
+# plan / diff implemented only in preview mode
+print_plan() {
   log
   echo "===================="
-  echo "exiftool plan / diff"
-  echo " [+] = create"
-  echo " [*] = modify"
   if [[ -n $debug ]]; then
-  echo " [ ] = no op"
+    echo "exiftool plan / diff"
+    echo " [+] = create"
+    echo " [*] = modify"
+    echo " [ ] = no op"
+  else
+    echo "exiftool plan (enable debug to view diff)"
+    echo " [+] = create"
+    echo " [*] = modify"
   fi
   echo "===================="
   # not super efficient but will do the job of diff'ing old vs new sidecars
@@ -145,5 +152,5 @@ else
   touch_absent_sidecars
   copy_existing_sidecars
   write_sidecars
-  print_diff
+  print_plan
 fi

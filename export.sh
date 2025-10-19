@@ -77,7 +77,7 @@ handle_sidecars() {
   if [[ -n $preview ]]; then
     rm -rf "$sidecars_preview_dir"
     if docker cp "$immich_container:$ime_dir/preview" "$sidecars_preview_dir" >/dev/null ; then
-      log "Preview run done. Generated sidecars are written to: $sidecars_preview_dir.
+      log "Preview done. Generated sidecars are written to: $sidecars_preview_dir.
 Generated files:
 $(find $sidecars_preview_dir -type f | head -3)
 ..."
