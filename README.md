@@ -14,7 +14,7 @@ Motivation:
 
 ## How to use
 
-1. Clone the repo or download three files: [export.sh](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/export.sh), [sidecars.sh](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/sidecars.sh), [metadata.sql](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/metadata.sql).
+1. Clone the repo or download the script [export.sh](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/export.sh) and two helper files [_sidecars.sh](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/_sidecars.sh), [_metadata.sql](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/_metadata.sql).
 
 2. Run the script in `preview` mode (dry run) and check the generated sidecars in `./sidecars-preview`:
 

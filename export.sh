@@ -33,8 +33,8 @@ postgres_container=${POSTGRES_CONTAINER:-immich_postgres}
 postgres_user=${POSTGRES_USER:-postgres}
 postgres_db=${POSTGRES_DB:-immich}
 
-query_metadata_file=metadata.sql
-sidecars_script=sidecars.sh
+metadata_script=_metadata.sql
+sidecars_script=_sidecars.sh
 metadata_file=metadata.json
 sidecars_preview_dir=sidecars-preview
 # path inside the immich container
@@ -63,7 +63,7 @@ immich_cmd() {
 
 export_metadata_to_json() {
   log "Export metadata to json in exiftool format: $metadata_file"
-  psql_cmd -Aq -v target="$target" -v asset_filter="$asset_filter" <"$query_metadata_file" > "$metadata_file"
+  psql_cmd -Aq -v target="$target" -v asset_filter="$asset_filter" <"$metadata_script" > "$metadata_file"
 
   if ! grep -q '[^[:space:]]' "$metadata_file" ; then
     log "WARN Empty result set in metadata.json: no asset metadata returned from the database. Check your filter."
