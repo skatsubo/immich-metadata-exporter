@@ -4,9 +4,8 @@
 
 ## Description
 
-This tool exports Immich asset metadata to companion [XMP sidecars](https://docs.immich.app/features/xmp-sidecars).
-
-This tool exports Immich asset metadata to XMP sidecar files. It can restore accidentally deleted sidecars or create new ones based on metadata stored in the Immich database.
+This tool exports Immich asset metadata to XMP sidecar files. It writes all [XMP metadata fields that Immich can write](https://docs.immich.app/features/xmp-sidecars).  
+Use it to restore accidentally deleted sidecars or create new ones based on metadata stored in the Immich database.
 
 Motivation:
 - I wrote this bash/SQL out of curiosity as a response to the Discord post: [Bulk (re)write of xmp sidecar files](https://discord.com/channels/979116623879368755/1425744361718677587) (see indexed web version at [AnswerOverflow](https://www.answeroverflow.com/m/1425744361718677587)).
@@ -14,7 +13,7 @@ Motivation:
 
 ## How to use
 
-1. Clone the repo or download the script [export.sh](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/export.sh) and two helper files [_sidecars.sh](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/_sidecars.sh), [_metadata.sql](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/_metadata.sql).
+1. Clone the repo on Immich host or download the script [export.sh](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/export.sh) and helper files [_sidecars.sh](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/_sidecars.sh), [_metadata.sql](https://raw.githubusercontent.com/skatsubo/immich-metadata-exporter/refs/heads/main/_metadata.sql).
 
 2. Run the script in `preview` mode (dry run) and check the generated sidecars in `./sidecars-preview`:
 
@@ -30,21 +29,23 @@ bash export.sh
 
 ### Examples
 
-Using environment variables. Targeting both known and unknown sidecars, run in preview mode, with debug output (prints diff for modified sidecars):
+**Using environment variables.**  
+Targeting both known and unknown sidecars, run in preview mode, with debug output (prints diff for modified sidecars).
 ```sh
 TARGET=all PREVIEW=1 DEBUG=1 bash export.sh
 ```
 
-Preview export with filtering: only process assets uploaded since 2025-10-10 and having "2025" in their file name. Using "heredoc" syntax for a complex SQL filter to avoid shell quoting headaches.
+**Preview export with filtering.**  
+Process assets uploaded since 2025-10-10 and having "2025" in their file name. Using "heredoc" syntax for a complex SQL filter to avoid shell quoting headaches.
 ```sh
 asset_filter=$(cat <<'EOF'
-"createdAt" >= '2025-10-10' AND "originalFileName" ILIKE '%2025%'
+"createdAt" >= '2025-10-10' AND "originalFileName" LIKE '%2025%'
 EOF
 )
 bash export.sh --target all --filter "$asset_filter" --preview
 ```
 
-Example output (trimmed):
+**Example output:**
 <details><summary>export.sh --target all --preview --debug</summary>
 
 ```
@@ -159,7 +160,7 @@ The script exports asset metadata to sidecars using:
 First, it extracts metadata from the database (by invoking psql in the database container) and saves it as a JSON file in exiftool format.
 Next, it invokes exiftool (in the Immich server container) to actually write sidecar files using data from the JSON file.
 
-The script does not modify Immich database in any way. E.g. upon creating a sidecar on disk it will not update `sidecarPath` value for the asset in the database. (Trigger the metadata refresh or sidecar discovery jobs to let Immich discover new sidecars.)
+The script does not modify Immich database in any way. E.g. upon creating a sidecar on disk it will not update `sidecarPath` value for the asset in the database. (Trigger the sidecar discovery job to let Immich discover new sidecars.)
 
 ## Caveats
 
@@ -178,8 +179,7 @@ Current limitations:
 
 - [ ] Avoid rewriting sidecars if content is not going to be modified
 - [ ] Face/people export
-- [ ] Preview stats: number of files to be created or modified
-- [ ] Cleanup on exit (remove tmp dir in the container)
+- [ ] Stats
 - [ ] Self contained export.sh
 
 ## Sidecar example
@@ -187,7 +187,7 @@ Current limitations:
 ### Exiftool
 
 ```sh
-exiftool -n -G -json portrait.jpg.xmp
+exiftool -n -json portrait.jpg.xmp
 ```
 
 JSON output:
